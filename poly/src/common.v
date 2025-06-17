@@ -3,6 +3,9 @@
 module poly
 
 import math { min }
+import rand
+import rand.pcg32
+import rand.seed
 
 struct Int4 {
 pub mut:
@@ -296,10 +299,11 @@ fn (i Int4) hash() u64 {
 	return (h ^ (h >> 33)) * final_mixer ^ ((h ^ (h >> 33)) * final_mixer >> 33)
 }
 
-
 //
 pub fn build(tr_name string) &Polyhedron {
-	mut p := Polyhedron{name: tr_name}
+	mut p := Polyhedron{
+		name: tr_name
+	}
 	return p.rebuild()
 }
 
@@ -338,4 +342,27 @@ fn (mut p Polyhedron) rebuild() &Polyhedron {
 	}
 	p.recalc()
 	return &p
+}
+
+fn build_rand(n int) &Polyhedron {
+	// Initialise the generator struct (note the `mut`)
+	mut rng := &rand.PRNG(pcg32.PCG32RNG{})
+	rng.seed(seed.time_seed_array(pcg32.seed_len))
+
+	mut random_index := rng.int_in_range(0, poly_initials.len) or { 0 }
+	mut p := new_poly_by_name(poly_initials[random_index])
+	for _ in 0 .. n {
+		match rng.int_in_range(0, 'kaqghpci'.len) or { 0 } {
+			0 { p = kiss_n(mut p, 0, 0.1) }
+			1 { p = ambo(mut p) }
+			2 { p = quinto(mut p) }
+			3 { p = gyro(mut p) }
+			4 { p = hollow(mut p) }
+			5 { p = propellor(mut p) }
+			6 { p = chamfer(mut p) }
+			7 { p = inset(mut p) }
+			else {}
+		}
+	}
+	return p.rebuild()
 }

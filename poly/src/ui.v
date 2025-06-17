@@ -216,6 +216,9 @@ fn my_event_manager(mut ev gg.Event, mut app App) {
 					.x {
 						app.rebuild_poly()
 					}
+					.z{
+						app.poly_=build_rand(5)
+					}
 					.r { // recolor poly
 						app.poly_.colors()
 					}
@@ -252,7 +255,7 @@ fn my_event_manager(mut ev gg.Event, mut app App) {
 					}
 					else {}
 				}
-				if ev.key_code in [.k, .a, .q, .g, .h, .p, .d, .c, .i] {
+				if ev.key_code in [.k, .a, .q, .g, .h, .p, .d, .c, .i, .z] {
 					app.poly_.recalc()
 				}
 				app.lap = now() - start

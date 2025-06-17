@@ -38,6 +38,8 @@ const plato_solids_names = {
 	'D': 'dodecahedron'
 }
 
+const poly_initials ='TCIOD'
+
 pub fn (p Polyhedron) poly_name() string {
 	if p.name in plato_solids_names {
 		return plato_solids_names[p.name]
