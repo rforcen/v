@@ -351,6 +351,7 @@ fn build_rand(n int) &Polyhedron {
 
 	mut random_index := rng.int_in_range(0, poly_initials.len) or { 0 }
 	mut p := new_poly_by_name(poly_initials[random_index])
+
 	for _ in 0 .. n {
 		match rng.int_in_range(0, 'kaqghpci'.len) or { 0 } {
 			0 { p = kiss_n(mut p, 0, 0.1) }
@@ -364,5 +365,5 @@ fn build_rand(n int) &Polyhedron {
 			else {}
 		}
 	}
-	return p.rebuild()
+	return p
 }
