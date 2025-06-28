@@ -1,0 +1,206 @@
+// ui
+module sh
+
+import gg
+import gx
+import sokol.sapp
+import sokol.gfx
+import sokol.sgl as gl
+import rand
+import rand.seed { time_seed_array }
+import time { now }
+
+const win_width = 800 * 2
+const win_height = 800 * 2
+const bg_color = gx.rgb(220, 220, 255) // Light blue background
+
+struct App {
+mut:
+	gg     &gg.Context = unsafe { nil }
+	pip_3d gl.Pipeline
+
+	init_flag   bool
+	frame_count int
+	mouse_x     int = -1
+	mouse_y     int = -1
+
+	sh_     SH
+	sh_code int
+	res     int = 256
+	lap     time.Duration
+	zoom    f32 = f32(-4)
+}
+
+// vertex specification for a draw_polyhedron with colored sides and texture coords
+fn draw_lines(sh_ SH) {
+	gl.c3f(0, 0, 1)
+	for face in sh_.faces {
+		gl.begin_line_strip()
+		for v in face {
+			mv := sh_.mesh[v]
+			crd, col := mv.coord.tof32(), mv.color.tof32()
+			gl.v3f_c3f(crd.x, crd.y, crd.z, col.x, col.y, col.z)
+		}
+		gl.end()
+	}
+}
+
+fn draw_solid(sh_ SH) {
+	for face in sh_.faces {
+		gl.begin_quads()
+		for v in face {
+			mv := sh_.mesh[v]
+			crd, col := mv.coord.tof32(), mv.color.tof32()
+			gl.v3f_c3f(crd.x, crd.y, crd.z, col.x, col.y, col.z)
+		}
+		gl.end()
+	}
+}
+
+fn draw_sh(sh_ SH) {
+	// draw_lines(sh_)
+	draw_solid(sh_)
+}
+
+fn draw(app App) {
+	gl.defaults()
+	gl.load_pipeline(app.pip_3d)
+
+	gl.matrix_mode_projection()
+	gl.perspective(gl.rad(45.0), 1, 0.1, 100)
+
+	gl.matrix_mode_modelview()
+	gl.translate(0, 0, app.zoom)
+	gl.rotate(gl.rad(app.mouse_x), 1, 0, 0)
+	gl.rotate(gl.rad(app.mouse_y), 0, 1, 0)
+
+	draw_sh(app.sh_)
+}
+
+fn frame(mut app App) {
+	app.gg.begin()
+
+	app.frame_count++
+
+	draw(app)
+
+	app.gg.end()
+}
+
+fn my_init(mut app App) {
+	app.init_flag = true
+
+	// set max vertices,
+	// for a large number of the same type of object it is better use the instances!!
+	desc := sapp.create_desc()
+	gfx.setup(&desc)
+	sgl_desc := gl.Desc{
+		max_vertices: 500 * 65536
+	}
+	gl.setup(&sgl_desc)
+
+	// 3d pipeline
+	mut pipdesc := gfx.PipelineDesc{}
+	unsafe { vmemset(&pipdesc, 0, int(sizeof(pipdesc))) }
+
+	color_state := gfx.ColorTargetState{
+		blend: gfx.BlendState{
+			enabled:        true
+			src_factor_rgb: .src_alpha
+			dst_factor_rgb: .one_minus_src_alpha
+		}
+	}
+	pipdesc.colors[0] = color_state
+
+	pipdesc.depth = gfx.DepthState{
+		write_enabled: true
+		compare:       .less_equal
+	}
+	pipdesc.cull_mode = .none // .back
+	app.pip_3d = gl.make_pipeline(&pipdesc)
+
+	app.rebuild_sh()
+}
+
+fn (mut app App) rebuild_sh() {
+	t0 := now()
+	app.sh_ = new_sh(app.res, 7, app.sh_code)
+	app.lap = now() - t0
+
+	gg.set_window_title('spherical harmonics, res: ${app.res}, code: ${sh_codes[app.sh_code]}, faces: ${app.sh_.faces.len}, vertexes: ${app.sh_.mesh.len}, lap: ${app.lap}')
+}
+
+fn my_event_manager(mut ev gg.Event, mut app App) {
+	match ev.typ {
+		.mouse_move {
+			app.mouse_x = int(ev.mouse_y)
+			app.mouse_y = int(ev.mouse_x)
+		}
+		.mouse_scroll {
+			app.zoom += ev.scroll_y
+		}
+		.key_down {
+			match ev.key_code {
+				.escape {
+					app.gg.quit()
+				}
+				.up, .space {
+					app.sh_code++
+					if app.sh_code >= sh_codes.len {
+						app.sh_code = 0
+					}
+					app.rebuild_sh()
+				}
+				.down {
+					app.sh_code--
+					if app.sh_code < 0 {
+						app.sh_code = sh_codes.len - 1
+					}
+					app.rebuild_sh()
+				}
+				.page_down {
+					app.res /= 2
+					if app.res < 8 {
+						app.res = 8
+					}
+					app.rebuild_sh()
+				}
+				.page_up {
+					app.res *= 2
+					if app.res > 2048 {
+						app.res = 2048
+					}
+					app.rebuild_sh()
+				}
+				.o { // save obj
+					app.sh_.write_obj() or { println('error writing obj') }
+				}
+				.r {
+					app.sh_code = rand_code()
+					app.rebuild_sh()
+				}
+				else {}
+			}
+		}
+		else {}
+	}
+}
+
+pub fn ui() {
+	rand.seed(time_seed_array(2))
+
+	mut app := &App{}
+	app.gg = gg.new_context(
+		width:         win_width
+		height:        win_height
+		create_window: true
+		window_title:  'sherical harmonics'
+		user_data:     app
+		bg_color:      bg_color
+		frame_fn:      frame
+		init_fn:       my_init
+		event_fn:      my_event_manager
+	)
+	app.sh_code = rand_code()
+	app.gg.run()
+}
